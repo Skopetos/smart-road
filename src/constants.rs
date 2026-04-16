@@ -1,6 +1,18 @@
 pub const WIN_W: f32 = 800.0;
 pub const WIN_H: f32 = 800.0;
 
+// Vehicle dimensions (pixels)
+pub const CAR_LENGTH: f32 = 28.0;
+pub const CAR_WIDTH:  f32 = 18.0;
+
+// Speed levels (pixels / second)
+pub const SPEED_SLOW:   f32 = 80.0;
+pub const SPEED_NORMAL: f32 = 150.0;
+pub const SPEED_FAST:   f32 = 230.0;
+
+// Minimum gap a vehicle must keep from the one ahead (pixels)
+pub const SAFE_DIST: f32 = 24.0;
+
 pub const LANE_W: f32 = 40.0;
 pub const CENTER_X: f32 = WIN_W / 2.0;   // 400.0
 pub const CENTER_Y: f32 = WIN_H / 2.0;   // 400.0
