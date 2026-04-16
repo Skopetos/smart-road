@@ -199,6 +199,13 @@ fn initial_heading(origin: Direction) -> f32 {
 
 // ── Path builder ──────────────────────────────────────────────────────────────
 
+/// Returns the off-screen spawn position for the given origin/route.
+/// Used by the spawner to check whether a new vehicle would overlap an existing one.
+pub fn spawn_pos(origin: Direction, route: Route) -> Vec2 {
+    let entry = entry_point(origin, route);
+    spawn_point(origin, entry)
+}
+
 /// Generates the complete waypoint list from off-screen spawn to off-screen despawn.
 fn build_path(origin: Direction, route: Route) -> Vec<Vec2> {
     let mut pts: Vec<Vec2> = Vec::new();

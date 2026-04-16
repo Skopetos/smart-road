@@ -98,54 +98,107 @@ fn draw_stop_lines() {
 }
 
 // ── Lane direction markers ────────────────────────────────────────────────────
+
+#[derive(Clone, Copy)]
+enum Turn { Right, Straight, Left }
+
 fn draw_lane_markers() {
-    let mid_north = INTER_T / 2.0;                       // 140
-    let mid_south = INTER_B + (WIN_H - INTER_B) / 2.0;  // 660
-    let mid_west  = INTER_L / 2.0;                       // 140
-    let mid_east  = INTER_R + (WIN_W - INTER_R) / 2.0;  // 660
+    let mid_north = INTER_T / 2.0;
+    let mid_south = INTER_B + (WIN_H - INTER_B) / 2.0;
+    let mid_west  = INTER_L / 2.0;
+    let mid_east  = INTER_R + (WIN_W - INTER_R) / 2.0;
 
-    // North arm — southbound (approach direction = PI/2 = ↓)
-    lane_mark(SB_R_X, mid_north, PI / 2.0, "r");
-    lane_mark(SB_S_X, mid_north, PI / 2.0, "s");
-    lane_mark(SB_L_X, mid_north, PI / 2.0, "l");
+    // North arm — southbound (approach = PI/2 = ↓)
+    lane_mark(SB_R_X, mid_north, PI / 2.0, Turn::Right);
+    lane_mark(SB_S_X, mid_north, PI / 2.0, Turn::Straight);
+    lane_mark(SB_L_X, mid_north, PI / 2.0, Turn::Left);
 
-    // South arm — northbound (approach direction = -PI/2 = ↑)
-    lane_mark(NB_L_X, mid_south, -PI / 2.0, "l");
-    lane_mark(NB_S_X, mid_south, -PI / 2.0, "s");
-    lane_mark(NB_R_X, mid_south, -PI / 2.0, "r");
+    // South arm — northbound (approach = -PI/2 = ↑)
+    lane_mark(NB_L_X, mid_south, -PI / 2.0, Turn::Left);
+    lane_mark(NB_S_X, mid_south, -PI / 2.0, Turn::Straight);
+    lane_mark(NB_R_X, mid_south, -PI / 2.0, Turn::Right);
 
-    // West arm — eastbound (approach direction = 0 = →)
-    lane_mark(mid_west, WB_R_Y, 0.0, "r");
-    lane_mark(mid_west, WB_S_Y, 0.0, "s");
-    lane_mark(mid_west, WB_L_Y, 0.0, "l");
+    // West arm — eastbound (approach = 0 = →) — south half (bottom lanes)
+    // Vehicles from west travel east → south half: l=420, s=460, r=500
+    lane_mark(mid_west, EB_L_Y, 0.0, Turn::Left);
+    lane_mark(mid_west, EB_S_Y, 0.0, Turn::Straight);
+    lane_mark(mid_west, EB_R_Y, 0.0, Turn::Right);
 
-    // East arm — westbound (approach direction = PI = ←)
-    lane_mark(mid_east, EB_L_Y, PI, "l");
-    lane_mark(mid_east, EB_S_Y, PI, "s");
-    lane_mark(mid_east, EB_R_Y, PI, "r");
+    // East arm — westbound (approach = PI = ←) — north half (top lanes)
+    // Vehicles from east travel west → north half: r=300, s=340, l=380
+    lane_mark(mid_east, WB_R_Y, PI, Turn::Right);
+    lane_mark(mid_east, WB_S_Y, PI, Turn::Straight);
+    lane_mark(mid_east, WB_L_Y, PI, Turn::Left);
 }
 
-// Draw one direction arrow + route letter for a lane
-fn lane_mark(cx: f32, cy: f32, angle: f32, label: &str) {
-    dir_arrow(cx, cy, angle, 26.0);
-    // Place label to the right of travel direction (perpendicular offset)
-    let right = Vec2::new(angle.sin(), -angle.cos()) * 14.0;
-    draw_text(label, cx + right.x - 5.0, cy + right.y + 5.0, 16.0, MARK_CLR);
+fn lane_mark(cx: f32, cy: f32, approach: f32, turn: Turn) {
+    match turn {
+        Turn::Straight => draw_straight_arrow(cx, cy, approach),
+        Turn::Right    => draw_curved_arrow(cx, cy, approach,  PI / 2.0),
+        Turn::Left     => draw_curved_arrow(cx, cy, approach, -PI / 2.0),
+    }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Arrow drawing ─────────────────────────────────────────────────────────────
 
-fn dir_arrow(cx: f32, cy: f32, angle: f32, len: f32) {
-    let dir = Vec2::new(angle.cos(), angle.sin());
-    let from = Vec2::new(cx, cy) - dir * (len / 2.0);
-    let to   = Vec2::new(cx, cy) + dir * (len / 2.0);
+/// A simple straight arrow centred at (cx, cy) pointing in `approach` direction.
+fn draw_straight_arrow(cx: f32, cy: f32, approach: f32) {
+    let dir  = Vec2::new(approach.cos(), approach.sin());
+    let from = Vec2::new(cx, cy) - dir * 18.0;
+    let to   = Vec2::new(cx, cy) + dir * 18.0;
+    draw_line(from.x, from.y, to.x, to.y, 2.5, MARK_CLR);
+    arrowhead(to, approach);
+}
 
-    draw_line(from.x, from.y, to.x, to.y, 2.0, MARK_CLR);
+/// A curved (90°) turn arrow.
+/// `sweep` = +PI/2 for a right turn, -PI/2 for a left turn.
+///
+/// Geometry (all in screen coords, y-down):
+///   exit direction  = approach + sweep
+///   arc center      = corner + exit_dir * arc_r
+///     where `corner` is where the stem meets the arc
+///   arc start angle = approach - sweep   (entry point is opposite the center offset)
+///   arc sweeps by `sweep` radians
+fn draw_curved_arrow(cx: f32, cy: f32, approach: f32, sweep: f32) {
+    const STEM_LEN: f32 = 13.0;
+    const ARC_R:    f32 = 11.0;
+    const N:        usize = 8;
 
-    // Arrowhead triangle
+    let approach_dir = Vec2::new(approach.cos(), approach.sin());
+    let exit_angle   = approach + sweep;
+    let exit_dir     = Vec2::new(exit_angle.cos(), exit_angle.sin());
+
+    // Shift the whole arrow slightly backward so the arc end is near (cx, cy)
+    let corner = Vec2::new(cx, cy) - approach_dir * (ARC_R * 0.5);
+
+    // Stem: goes from (corner - approach_dir*STEM_LEN) to corner
+    let stem_start = corner - approach_dir * STEM_LEN;
+    draw_line(stem_start.x, stem_start.y, corner.x, corner.y, 2.5, MARK_CLR);
+
+    // Arc center is displaced from corner toward the exit side
+    let arc_center   = corner + exit_dir * ARC_R;
+    // Start angle: entry point (= corner) relative to arc_center = -exit_dir → angle = exit_angle + PI
+    let start_angle  = exit_angle + PI;
+
+    // Draw arc as N line segments
+    let mut prev = corner;
+    for i in 1..=N {
+        let t = i as f32 / N as f32;
+        let a = start_angle + t * sweep;
+        let p = arc_center + Vec2::new(a.cos(), a.sin()) * ARC_R;
+        draw_line(prev.x, prev.y, p.x, p.y, 2.5, MARK_CLR);
+        prev = p;
+    }
+
+    arrowhead(prev, exit_angle);
+}
+
+/// Filled triangle arrowhead at `tip` pointing in `angle` direction.
+fn arrowhead(tip: Vec2, angle: f32) {
+    let dir  = Vec2::new(angle.cos(), angle.sin());
     let perp = Vec2::new(-dir.y, dir.x);
-    let head_base = to - dir * 9.0;
-    draw_triangle(to, head_base + perp * 5.0, head_base - perp * 5.0, MARK_CLR);
+    let base = tip - dir * 8.0;
+    draw_triangle(tip, base + perp * 5.0, base - perp * 5.0, MARK_CLR);
 }
 
 fn dash_v(x: f32, y0: f32, y1: f32) {
