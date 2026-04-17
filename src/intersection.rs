@@ -103,10 +103,10 @@ fn draw_stop_lines() {
 enum Turn { Right, Straight, Left }
 
 fn draw_lane_markers() {
-    let mid_north = INTER_T / 2.0;
-    let mid_south = INTER_B + (WIN_H - INTER_B) / 2.0;
-    let mid_west  = INTER_L / 2.0;
-    let mid_east  = INTER_R + (WIN_W - INTER_R) / 2.0;
+    let mid_north = INTER_T - 60.0;                  // 220 — near north stop line
+    let mid_south = INTER_B + 60.0;                  // 580 — near south stop line
+    let mid_west  = INTER_L - 60.0;                  // 220 — near west stop line
+    let mid_east  = INTER_R + 60.0;                  // 580 — near east stop line
 
     // North arm — southbound (approach = PI/2 = ↓)
     lane_mark(SB_R_X, mid_north, PI / 2.0, Turn::Right);
