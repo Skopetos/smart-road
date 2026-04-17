@@ -142,3 +142,30 @@ Displayed after Esc is pressed:
   5. Set v.velocity, then call v.update()                                             
                                                                                                                                                   
   Two small helper functions in main.rs: path_gap(follower, leader) -> f32 and desired_velocity(gap) -> f32
+
+
+
+  What step 6 builds:                                                                                                                             
+  1. A tile grid covering the intersection box (240×240 px → 10×10 tiles of 24×24 px each)                                                        
+  2. A reservation table: HashMap<(tile_x, tile_y, time_slot), vehicle_id>                                                                        
+  3. A method to compute which (tile, time_slot) pairs a vehicle will occupy given its current position, speed, and route                         
+  4. Optional debug overlay: draw the grid (toggled with a key)                                                                                   
+                                                                                                                                                  
+  New VehicleState::Reserved — added to the existing enum (concept.md lists it). A vehicle transitions Approaching → Reserved once its reservation
+   is granted.                                                                                                                                    
+                                                                                                                                                  
+  New file: src/reservation.rs — owns the ReservationTable struct with request, release, and tile-path helpers.                                   
+                  
+  Constants to add:                                                                                                                               
+  - GRID_N: usize = 10 — tiles per side
+  - TILE_PX: f32 = 24.0 — px per tile (240 / 10)                                                                                                  
+  - TIME_SLOT: f32 = 0.1 — seconds per slot     
+                                                                                                                                                  
+  Tile-path computation logic:
+  - Walk the vehicle's waypoints that fall inside the intersection box                                                                            
+  - For each waypoint, convert (x, y) → (tile_x, tile_y)              
+  - Estimate arrival time at each waypoint from current position + speed                                                                          
+  - Also account for car half-length in all 4 directions (a vehicle occupies up to a 2×2 tile footprint)  
+
+  Step 7 will use the table to grant/deny. Step 6 just builds and populates it correctly — vehicles don't yet stop at the entry, they pass through
+   freely while the table is being reserved behind the scenes. 

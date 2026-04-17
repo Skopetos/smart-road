@@ -1,11 +1,13 @@
 mod constants;
 mod intersection;
+mod reservation;
 mod vehicle;
 
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
 use constants::*;
-use vehicle::{Direction, Route, Vehicle, spawn_pos};
+use reservation::ReservationTable;
+use vehicle::{Direction, Route, Vehicle, VehicleState, spawn_pos};
 
 // Minimum gap between two vehicles in the same lane at the spawn point.
 // Prevents vehicles being created on top of each other when keys are spammed.
@@ -90,9 +92,11 @@ fn try_spawn(vehicles: &mut Vec<Vehicle>, id: &mut u32, origin: Direction, route
 async fn main() {
     let grass = Color { r: 0.13, g: 0.40, b: 0.13, a: 1.0 };
 
-    let mut vehicles: Vec<Vehicle> = Vec::new();
+    let mut vehicles:     Vec<Vehicle>     = Vec::new();
+    let mut reservations: ReservationTable = ReservationTable::new();
     let mut next_id:  u32  = 0;
     let mut r_timer:  f32  = R_INTERVAL; // start ready so first R press spawns immediately
+    let mut show_grid: bool = false;
 
     loop {
         let dt  = get_frame_time().min(0.05);
@@ -127,6 +131,11 @@ async fn main() {
             r_timer = R_INTERVAL; // reset so the next R press spawns immediately
         }
 
+        // ── G: toggle tile-grid debug overlay ────────────────────────────────
+        if is_key_pressed(KeyCode::G) {
+            show_grid = !show_grid;
+        }
+
         // ── Esc: quit (stats window will be added in step 9) ──────────────────
         if is_key_pressed(KeyCode::Escape) {
             break;
@@ -149,16 +158,40 @@ async fn main() {
             desired_vels[i] = desired_velocity(min_gap);
         }
 
-        // ── Update ─────────────────────────────────────────────────────────────
+        // ── Update + reservation lifecycle ────────────────────────────────────
         for (i, v) in vehicles.iter_mut().enumerate() {
             v.velocity = desired_vels[i];
+            let prev_state = v.state;
             v.update(dt, now);
+
+            // Just entered the intersection: make a reservation
+            if prev_state != VehicleState::InIntersection
+                && v.state == VehicleState::InIntersection
+            {
+                reservations.request(v, now);
+            }
+            // Just exited the intersection: free its tiles
+            if prev_state == VehicleState::InIntersection
+                && v.state == VehicleState::Exiting
+            {
+                reservations.release(v.id);
+            }
+        }
+
+        // Release any vehicles that finished without passing through the box
+        for v in vehicles.iter().filter(|v| v.is_done()) {
+            reservations.release(v.id);
         }
         vehicles.retain(|v| !v.is_done());
+
+        reservations.cleanup(now);
 
         // ── Draw ───────────────────────────────────────────────────────────────
         clear_background(grass);
         intersection::draw();
+        if show_grid {
+            reservations.draw_debug(now);
+        }
         for v in &vehicles {
             v.draw();
         }

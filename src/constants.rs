@@ -13,6 +13,11 @@ pub const SPEED_FAST:   f32 = 230.0;
 // Minimum gap a vehicle must keep from the one ahead (pixels)
 pub const SAFE_DIST: f32 = 24.0;
 
+// Intersection tile grid
+pub const GRID_N:    usize = 10;   // tiles per side
+pub const TILE_PX:   f32   = 24.0; // pixels per tile (ROAD_W / GRID_N)
+pub const TIME_SLOT: f32   = 0.1;  // seconds per reservation slot
+
 pub const LANE_W: f32 = 40.0;
 pub const CENTER_X: f32 = WIN_W / 2.0;   // 400.0
 pub const CENTER_Y: f32 = WIN_H / 2.0;   // 400.0

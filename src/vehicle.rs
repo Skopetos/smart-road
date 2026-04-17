@@ -26,6 +26,7 @@ pub enum Route { Right, Straight, Left }
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum VehicleState {
     Approaching,      // outside intersection box, heading toward it
+    Reserved,         // reservation granted, cleared to enter
     InIntersection,   // inside the intersection box
     Exiting,          // has left the box, travelling to screen edge
     Done,             // off-screen, ready to be removed
