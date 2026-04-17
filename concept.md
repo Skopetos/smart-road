@@ -149,7 +149,7 @@ Displayed after Esc is pressed:
   1. A tile grid covering the intersection box (240×240 px → 10×10 tiles of 24×24 px each)                                                        
   2. A reservation table: HashMap<(tile_x, tile_y, time_slot), vehicle_id>                                                                        
   3. A method to compute which (tile, time_slot) pairs a vehicle will occupy given its current position, speed, and route                         
-  4. Optional debug overlay: draw the grid (toggled with a key)                                                                                   
+  4. Optional debug overlay: draw the grid (toggled with  G key)                                                                                   
                                                                                                                                                   
   New VehicleState::Reserved — added to the existing enum (concept.md lists it). A vehicle transitions Approaching → Reserved once its reservation
    is granted.                                                                                                                                    
@@ -169,3 +169,12 @@ Displayed after Esc is pressed:
 
   Step 7 will use the table to grant/deny. Step 6 just builds and populates it correctly — vehicles don't yet stop at the entry, they pass through
    freely while the table is being reserved behind the scenes. 
+
+    Here's what was added:                                                                                                                          
+                                                                                                                                                  
+  - src/reservation.rs — ReservationTable with request, release, cleanup, and draw_debug                                                          
+  - Tile-path computation — walks the vehicle's remaining waypoints, sampling every 12px (half a tile). Each sample inside the intersection box   
+  maps to a (tile_x, tile_y, time_slot) key                                                                                                       
+  - Lifecycle wiring — reservations are made when a vehicle enters InIntersection, released when it transitions to Exiting or is removed          
+  - G key — toggles the debug overlay: white grid lines + orange highlights on tiles reserved near the current time slot                          
+  - VehicleState::Reserved — added to the enum, ready for step 7  
