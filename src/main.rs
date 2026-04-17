@@ -23,6 +23,38 @@ fn window_conf() -> Conf {
     }
 }
 
+/// Returns the bumper-to-bumper gap (px) if `leader` is ahead of `follower` on
+/// the same waypoint path, or a negative value if `leader` is actually behind.
+fn path_gap(follower: &Vehicle, leader: &Vehicle) -> f32 {
+    let leader_is_ahead = if leader.wp_idx != follower.wp_idx {
+        leader.wp_idx > follower.wp_idx
+    } else {
+        // Same waypoint index: whoever is closer to the next waypoint is ahead.
+        let nf = follower.wp_idx + 1;
+        let nl = leader.wp_idx + 1;
+        if nf >= follower.waypoints.len() || nl >= leader.waypoints.len() {
+            return -1.0;
+        }
+        let dist_leader   = (leader.pos   - leader.waypoints[nl]).length();
+        let dist_follower = (follower.pos  - follower.waypoints[nf]).length();
+        dist_leader < dist_follower
+    };
+    if !leader_is_ahead {
+        return -1.0;
+    }
+    (leader.pos - follower.pos).length() - CAR_LENGTH
+}
+
+/// Maps a bumper-to-bumper gap to a target speed.
+/// At gap >= SAFE_DIST → full speed; at gap = 0 → stopped.
+fn desired_velocity(gap: f32) -> f32 {
+    if gap >= SAFE_DIST {
+        SPEED_NORMAL
+    } else {
+        (SPEED_NORMAL * gap / SAFE_DIST).max(0.0)
+    }
+}
+
 fn random_route() -> Route {
     match gen_range(0u32, 3) {
         0 => Route::Right,
@@ -100,8 +132,26 @@ async fn main() {
             break;
         }
 
+        // ── Compute following distances and set velocities ─────────────────────
+        let n = vehicles.len();
+        let mut desired_vels: Vec<f32> = vec![SPEED_NORMAL; n];
+        for i in 0..n {
+            let mut min_gap = f32::MAX;
+            for j in 0..n {
+                if i == j { continue; }
+                if vehicles[i].origin != vehicles[j].origin { continue; }
+                if vehicles[i].route  != vehicles[j].route  { continue; }
+                let gap = path_gap(&vehicles[i], &vehicles[j]);
+                if gap >= 0.0 && gap < min_gap {
+                    min_gap = gap;
+                }
+            }
+            desired_vels[i] = desired_velocity(min_gap);
+        }
+
         // ── Update ─────────────────────────────────────────────────────────────
-        for v in &mut vehicles {
+        for (i, v) in vehicles.iter_mut().enumerate() {
+            v.velocity = desired_vels[i];
             v.update(dt, now);
         }
         vehicles.retain(|v| !v.is_done());

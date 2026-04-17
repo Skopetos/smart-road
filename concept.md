@@ -123,3 +123,22 @@ Displayed after Esc is pressed:
 - Max time any vehicle took to cross the intersection
 - Min time any vehicle took to cross the intersection
 - Number of close calls (safe distance violated between two vehicles)
+
+
+
+
+
+
+
+
+ Two vehicles share the exact same path when they have the same origin and route. So we only need to compare within (origin, route) 
+  groups.                                                                                                                                         
+                                                                                                                                                  
+  Algorithm per frame (in main.rs):                                                                                                               
+  1. For each vehicle i, scan all other vehicles with same (origin, route)                                                                        
+  2. Determine which one is "ahead" using wp_idx (higher = further along path)                                                                    
+  3. Compute bumper-to-bumper gap = Euclidean distance between centers - CAR_LENGTH
+  4. desired_velocity = SPEED_NORMAL * (gap / SAFE_DIST), clamped to [0, SPEED_NORMAL]                                                            
+  5. Set v.velocity, then call v.update()                                             
+                                                                                                                                                  
+  Two small helper functions in main.rs: path_gap(follower, leader) -> f32 and desired_velocity(gap) -> f32
